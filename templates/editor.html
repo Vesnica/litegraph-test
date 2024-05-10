@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteGraph Editor</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='litegraph.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='default.css') }}">
+    <script src="{{ url_for('static', filename='litegraph.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
+</head>
+
+<body>
+    <canvas id="mycanvas"></canvas>
+    {% for script_path in script_list %}
+    <script src="{{ url_for('custom_nodes', filename=script_path) }}"></script>
+    {% endfor %}
+    <script>
+        var canvas = document.getElementById("mycanvas");
+        var ctx = canvas.getContext("2d");
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+    </script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        socket.on('progress', function (data) {
+            console.log(data.progress);
+        });
+    </script>
+    <script>
+        var graph = new LiteGraph.LGraph();
+        var graphCanvas = new LiteGraph.LGraphCanvas("#mycanvas", graph);
+    </script>
+    <script>
+        function handleKeyPress(event) {
+            // 确保有一个活动的LGraph和LGraphCanvas实例
+            if (!graph || !graphCanvas) return;
+
+            // 直接访问selected_nodes属性获取选中的节点
+            var selectedNodes = graphCanvas.selected_nodes;
+
+            // 删除节点：按下Delete键
+            if (event.key === "Delete") {
+                if (!selectedNodes || Object.keys(selectedNodes).length === 0) return;
+                Object.values(selectedNodes).forEach((node) => {
+                    graph.remove(node); // 从图中删除节点
+                });
+                graphCanvas.dirtyCanvas = true; // 标记为需要重绘
+                graphCanvas.deselectAllNodes(); // 删除后取消所有节点的选中状态
+            }
+
+            // 复制节点：按下Ctrl + C
+            if (event.ctrlKey && event.key.toLowerCase() === "c") {
+                if (!selectedNodes || Object.keys(selectedNodes).length === 0) return;
+                graphCanvas.copyToClipboard(); // 复制选中的节点到剪贴板
+            }
+
+            // 粘贴节点：按下Ctrl + V
+            if (event.ctrlKey && event.key.toLowerCase() === "v") {
+                graphCanvas.pasteFromClipboard(); // 从剪贴板粘贴节点
+            }
+
+            // 如果画布内容变更，需要刷新画布
+            if (graphCanvas.dirtyCanvas) graphCanvas.draw();
+        }
+        document.addEventListener("keydown", function (event) {
+            handleKeyPress(event);
+        });
+    </script>
+</body>
+
+</html>
